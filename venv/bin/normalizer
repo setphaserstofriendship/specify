@@ -1,4 +1,4 @@
-#!/home/lukash/scripts/Sweatify/venv/bin/python3
+#!/home/lukash/scripts/specify/venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys
