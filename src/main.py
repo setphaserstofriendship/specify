@@ -51,14 +51,25 @@ def add_tracks_to_playlist(sp, playlist_id, tracks):
 
 # Main function
 def main():
-    target_tempo = 170 # Desired tempo
-    tempo_tolerance = 5 # Tolerance for tempo matching
+    ascii_art = """
+  ____                  _  __       
+ / ___| _ __   ___  ___(_)/ _|_   _ 
+ \___ \| '_ \ / _ \/ __| | |_| | | |
+  ___) | |_) |  __/ (__| |  _| |_| |
+ |____/| .__/ \___|\___|_|_|  \__, |
+       |_|                    |___/ 
+
+    """
+    print(ascii_art)
+    print("Generate spotify playlists based on tempo.")
+    target_tempo = int(input("Enter desired tempo (bpm): "))  # Desired tempo
+    tempo_tolerance = int(input("Specify +- bpm tolerance (low tolerance may lead to a short playlist): "))  # Tolerance
 
     user_id = sp.current_user()['id']
 
     # Get top tracks
     top_tracks = get_top_tracks(sp)
-    seed_tracks = [track['id'] for track in top_tracks[:5]] # Use up to 5 top tracks as seeds
+    seed_tracks = [track['id'] for track in top_tracks[:5]]  # Use up to 5 top tracks as seeds
 
     # Get recommended tracks
     recommended_tracks = get_recommendations(sp, seed_tracks=seed_tracks, limit=100)
@@ -72,8 +83,8 @@ def main():
         return
 
     # Create a new playlist
-    playlist_name = f"Tempo {target_tempo} Playlist"
-    playlist_description = "Sweatify playlist"
+    playlist_name = input("Playlist name: ")
+    playlist_description = input("Playlist description: ")
     playlist_id = create_playlist(sp, user_id, playlist_name, playlist_description)
 
     # Add tracks to the new playlist
