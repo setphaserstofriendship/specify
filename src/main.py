@@ -1,9 +1,10 @@
+import os
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
 # Spotify API credentials
-CLIENT_ID = "ae39d3abd1db424db5e8baffa636df68"
-CLIENT_SECRET = "83eba2826ffe487890e822367520293a"
+CLIENT_ID = os.getenv('SPOTIPY_CLIENT_ID')
+CLIENT_SECRET = os.getenv('SPOTIPY_CLIENT_SECRET')
 REDIRECT_URI = "http://localhost:8888/callback"
 SCOPE = "user-library-read playlist-modify-public user-top-read"
 
@@ -12,6 +13,20 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=CLIENT_ID,
                                                client_secret=CLIENT_SECRET,
                                                redirect_uri=REDIRECT_URI,
                                                scope=SCOPE))
+
+
+def display_banner():
+    banner = r"""
+      ____                  _  __       
+     / ___| _ __   ___  ___(_)/ _|_   _ 
+     \___ \| '_ \ / _ \/ __| | |_| | | |
+      ___) | |_) |  __/ (__| |  _| |_| |
+     |____/| .__/ \___|\___|_|_|  \__, |
+           |_|                    |___/ 
+
+        """
+    print(banner)
+    print("Generate customized Spotify playlists.")
 
 
 def get_top_tracks(sp, limit=50, time_range='medium_term'):
@@ -51,17 +66,7 @@ def add_tracks_to_playlist(sp, playlist_id, tracks):
 
 # Main function
 def main():
-    ascii_art = """
-  ____                  _  __       
- / ___| _ __   ___  ___(_)/ _|_   _ 
- \___ \| '_ \ / _ \/ __| | |_| | | |
-  ___) | |_) |  __/ (__| |  _| |_| |
- |____/| .__/ \___|\___|_|_|  \__, |
-       |_|                    |___/ 
-
-    """
-    print(ascii_art)
-    print("Generate spotify playlists based on tempo.")
+    display_banner()
     target_tempo = int(input("Enter desired tempo (bpm): "))  # Desired tempo
     tempo_tolerance = int(input("Specify +- bpm tolerance (low tolerance may lead to a short playlist): "))  # Tolerance
 
@@ -69,7 +74,7 @@ def main():
 
     # Get top tracks
     top_tracks = get_top_tracks(sp)
-    seed_tracks = [track['id'] for track in top_tracks[:5]]  # Use up to 5 top tracks as seeds
+    seed_tracks = [track['id'] for track in top_tracks[:5]]  # Use top tracks as seeds
 
     # Get recommended tracks
     recommended_tracks = get_recommendations(sp, seed_tracks=seed_tracks, limit=100)
