@@ -76,15 +76,26 @@ def main():
     top_tracks = get_top_tracks(sp)
     seed_tracks = [track['id'] for track in top_tracks[:5]]  # Use top tracks as seeds
 
-    # Get recommended tracks
-    recommended_tracks = get_recommendations(sp, seed_tracks=seed_tracks, limit=100)
+    # Get recommended tracks and filter by tempo
+    filtered_tracks = []
+    while len(filtered_tracks) < 8:
+        recommended_tracks = get_recommendations(sp, seed_tracks=seed_tracks, limit=100)
+        new_filtered_tracks = filter_tracks_by_tempo(sp, recommended_tracks, target_tempo, tempo_tolerance)
 
-    # Filter tracks by tempo
-    filtered_tracks = filter_tracks_by_tempo(sp, recommended_tracks, target_tempo, tempo_tolerance)
+        # Add only new tracks to avoid duplicates
+        new_filtered_tracks_ids = {track['id'] for track in new_filtered_tracks}
+        existing_filtered_tracks_ids = {track['id'] for track in filtered_tracks}
+        unique_new_tracks = [track for track in new_filtered_tracks if track['id'] not in existing_filtered_tracks_ids]
 
-    # Ensure there are tracks to add
-    if not filtered_tracks:
-        print("No tracks found with the specified tempo.")
+        filtered_tracks.extend(unique_new_tracks)
+
+        # Check if we have enough unique recommendations to proceed
+        if len(recommended_tracks) < 100:
+            break
+
+    # Ensure there are enough tracks to create a playlist
+    if len(filtered_tracks) < 8:
+        print("Not enough tracks found with the specified tempo.")
         return
 
     # Create a new playlist
