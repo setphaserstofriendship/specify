@@ -69,6 +69,7 @@ def main():
     display_banner()
     target_tempo = int(input("Enter desired tempo (bpm): "))  # Desired tempo
     tempo_tolerance = int(input("Specify +- bpm tolerance (low tolerance may lead to a short playlist): "))  # Tolerance
+    playlist_length = int(input("Minimum playlist length (no. of tracks): "))
 
     user_id = sp.current_user()['id']
 
@@ -78,7 +79,7 @@ def main():
 
     # Get recommended tracks and filter by tempo
     filtered_tracks = []
-    while len(filtered_tracks) < 8:
+    while len(filtered_tracks) < playlist_length:
         recommended_tracks = get_recommendations(sp, seed_tracks=seed_tracks, limit=100)
         new_filtered_tracks = filter_tracks_by_tempo(sp, recommended_tracks, target_tempo, tempo_tolerance)
 
@@ -94,8 +95,8 @@ def main():
             break
 
     # Ensure there are enough tracks to create a playlist
-    if len(filtered_tracks) < 8:
-        print("Not enough tracks found with the specified tempo.")
+    if len(filtered_tracks) < playlist_length:
+        print("Not enough tracks. Try increasing tempo tolerance and/or reducing playlist length.")
         return
 
     # Create a new playlist
