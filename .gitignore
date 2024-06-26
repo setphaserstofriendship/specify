@@ -1,4 +1,5 @@
 .idea/
 src/.cache
+src/specify
 venv/
 .cache

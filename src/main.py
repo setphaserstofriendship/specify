@@ -1,3 +1,5 @@
+#!/home/lukash/scripts/specify/venv/bin/python
+
 import os
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -29,17 +31,20 @@ def display_banner():
     print("Generate customized Spotify playlists.")
 
 
-def get_top_tracks(sp, limit=50, time_range='medium_term'):
+def get_top_tracks(sp, limit=50, time_range='long_term'):
+    print("Fetching top tracks...")
     top_tracks = sp.current_user_top_tracks(limit=limit, time_range=time_range)
     return top_tracks['items']
 
 
 def get_recommendations(sp, seed_tracks=None, limit=100):
+    print("Fetching recommendations...")
     recommendations = sp.recommendations(seed_tracks=seed_tracks, limit=limit)
     return recommendations['tracks']
 
 
 def filter_tracks_by_tempo(sp, tracks, target_tempo, tempo_tolerance=2):
+    print("Filtering tracks by tempo...")
     tracks_ids = [track['id'] for track in tracks]
     audio_features = sp.audio_features(tracks=tracks_ids)
 
@@ -47,11 +52,22 @@ def filter_tracks_by_tempo(sp, tracks, target_tempo, tempo_tolerance=2):
     for track, features in zip(tracks, audio_features):
         if features and abs(features['tempo'] - target_tempo) <= tempo_tolerance:
             filtered_tracks.append(track)
-
     return filtered_tracks
 
 
+def get_all_playlist_tracks(sp, user_id):
+    print("Fetching all playlist tracks...")
+    playlists = sp.user_playlists(user_id)
+    all_tracks = set()
+    for playlist in playlists['items']:
+        tracks = sp.playlist_tracks(playlist['id'])
+        for item in tracks['items']:
+            all_tracks.add(item['track']['id'])
+    return all_tracks
+
+
 def create_playlist(sp, user_id, name, description):
+    print(f"Creating playlist '{name}'...")
     playlist = sp.user_playlist_create(user_id, name, description=description)
     return playlist['id']
 
@@ -70,8 +86,14 @@ def main():
     target_tempo = int(input("Enter desired tempo (bpm): "))  # Desired tempo
     tempo_tolerance = int(input("Specify +- bpm tolerance (low tolerance may lead to a short playlist): "))  # Tolerance
     playlist_length = int(input("Minimum playlist length (no. of tracks): "))
+    exclude_existing_tracks = input("Should the playlist exclude tracks already present in your other playlists? (y/n): ").strip().lower() == 'y'
 
     user_id = sp.current_user()['id']
+
+    # Get all tracks from all user's playlists if necessary
+    all_user_tracks = set()
+    if exclude_existing_tracks:
+        all_user_tracks = get_all_playlist_tracks(sp, user_id)
 
     # Get top tracks
     top_tracks = get_top_tracks(sp)
@@ -83,10 +105,13 @@ def main():
         recommended_tracks = get_recommendations(sp, seed_tracks=seed_tracks, limit=100)
         new_filtered_tracks = filter_tracks_by_tempo(sp, recommended_tracks, target_tempo, tempo_tolerance)
 
-        # Add only new tracks to avoid duplicates
+        # Add only new tracks to avoid duplicates and existing user tracks if needed
         new_filtered_tracks_ids = {track['id'] for track in new_filtered_tracks}
         existing_filtered_tracks_ids = {track['id'] for track in filtered_tracks}
-        unique_new_tracks = [track for track in new_filtered_tracks if track['id'] not in existing_filtered_tracks_ids]
+        if exclude_existing_tracks:
+            unique_new_tracks = [track for track in new_filtered_tracks if track['id'] not in existing_filtered_tracks_ids and track['id'] not in all_user_tracks]
+        else:
+            unique_new_tracks = [track for track in new_filtered_tracks if track['id'] not in existing_filtered_tracks_ids]
 
         filtered_tracks.extend(unique_new_tracks)
 
