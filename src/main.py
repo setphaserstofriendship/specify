@@ -3,6 +3,17 @@
 import os
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from functions import (
+    display_banner,
+    get_top_tracks,
+    get_liked_songs,
+    get_random_seed_tracks,
+    get_recommendations,
+    filter_tracks_by_tempo,
+    get_all_playlist_tracks,
+    create_playlist,
+    add_tracks_to_playlist
+)
 
 # Spotify API credentials
 CLIENT_ID = os.getenv('SPOTIPY_CLIENT_ID')
@@ -17,69 +28,6 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=CLIENT_ID,
                                                scope=SCOPE))
 
 
-def display_banner():
-    banner = r"""
-      ____                  _  __       
-     / ___| _ __   ___  ___(_)/ _|_   _ 
-     \___ \| '_ \ / _ \/ __| | |_| | | |
-      ___) | |_) |  __/ (__| |  _| |_| |
-     |____/| .__/ \___|\___|_|_|  \__, |
-           |_|                    |___/ 
-
-        """
-    print(banner)
-    print("Generate customized Spotify playlists.")
-
-
-def get_top_tracks(sp, limit=50, time_range='long_term'):
-    print("Fetching top tracks...")
-    top_tracks = sp.current_user_top_tracks(limit=limit, time_range=time_range)
-    return top_tracks['items']
-
-
-def get_recommendations(sp, seed_tracks=None, limit=100):
-    print("Fetching recommendations...")
-    recommendations = sp.recommendations(seed_tracks=seed_tracks, limit=limit)
-    return recommendations['tracks']
-
-
-def filter_tracks_by_tempo(sp, tracks, target_tempo, tempo_tolerance=2):
-    print("Filtering tracks by tempo...")
-    tracks_ids = [track['id'] for track in tracks]
-    audio_features = sp.audio_features(tracks=tracks_ids)
-
-    filtered_tracks = []
-    for track, features in zip(tracks, audio_features):
-        if features and abs(features['tempo'] - target_tempo) <= tempo_tolerance:
-            filtered_tracks.append(track)
-    return filtered_tracks
-
-
-def get_all_playlist_tracks(sp, user_id):
-    print("Fetching all playlist tracks...")
-    playlists = sp.user_playlists(user_id)
-    all_tracks = set()
-    for playlist in playlists['items']:
-        tracks = sp.playlist_tracks(playlist['id'])
-        for item in tracks['items']:
-            all_tracks.add(item['track']['id'])
-    return all_tracks
-
-
-def create_playlist(sp, user_id, name, description):
-    print(f"Creating playlist '{name}'...")
-    playlist = sp.user_playlist_create(user_id, name, description=description)
-    return playlist['id']
-
-
-def add_tracks_to_playlist(sp, playlist_id, tracks):
-    if not tracks:
-        print("No tracks to add to the playlist.")
-        return
-    track_ids = [track['id'] for track in tracks]
-    sp.playlist_add_items(playlist_id, track_ids)
-
-
 # Main function
 def main():
     display_banner()
@@ -88,6 +36,9 @@ def main():
     playlist_length = int(input("Minimum playlist length (no. of tracks): "))
     exclude_existing_tracks = input("Should the playlist exclude tracks already present in your other playlists? (y/n): ").strip().lower() == 'y'
 
+    # Ask user to select seed type
+    seed_source = input("Seed playlist with (1) Top tracks or (2) Liked songs? Enter 1 or 2: ").strip()
+
     user_id = sp.current_user()['id']
 
     # Get all tracks from all user's playlists if necessary
@@ -95,25 +46,40 @@ def main():
     if exclude_existing_tracks:
         all_user_tracks = get_all_playlist_tracks(sp, user_id)
 
-    # Get top tracks
-    top_tracks = get_top_tracks(sp)
-    seed_tracks = [track['id'] for track in top_tracks[:5]]  # Use top tracks as seeds
+    # Get seed tracks based on user choice
+    seed_tracks = []
+    if seed_source == '1':
+        top_tracks = get_top_tracks(sp)
+        seed_tracks = [track['id'] for track in top_tracks[:5]]  # Use top tracks as seeds
+    elif seed_source == '2':
+        liked_tracks = get_liked_songs(sp, limit=50)  # Fetch liked songs (limit to 100 for performance)
+        seed_tracks = [track['id'] for track in
+                       get_random_seed_tracks(liked_tracks, seed_count=5)]  # Randomly select 5 liked songs
 
     # Get recommended tracks and filter by tempo
     filtered_tracks = []
+    all_tempos = []  # To store the tempos of all filtered tracks
     while len(filtered_tracks) < playlist_length:
         recommended_tracks = get_recommendations(sp, seed_tracks=seed_tracks, limit=100)
-        new_filtered_tracks = filter_tracks_by_tempo(sp, recommended_tracks, target_tempo, tempo_tolerance)
+        new_filtered_tracks, new_tempos = filter_tracks_by_tempo(sp, recommended_tracks, target_tempo,
+                                                                 tempo_tolerance)
 
         # Add only new tracks to avoid duplicates and existing user tracks if needed
         new_filtered_tracks_ids = {track['id'] for track in new_filtered_tracks}
         existing_filtered_tracks_ids = {track['id'] for track in filtered_tracks}
         if exclude_existing_tracks:
-            unique_new_tracks = [track for track in new_filtered_tracks if track['id'] not in existing_filtered_tracks_ids and track['id'] not in all_user_tracks]
+            unique_new_tracks = [track for track in new_filtered_tracks if
+                                 track['id'] not in existing_filtered_tracks_ids and track[
+                                     'id'] not in all_user_tracks]
         else:
-            unique_new_tracks = [track for track in new_filtered_tracks if track['id'] not in existing_filtered_tracks_ids]
+            unique_new_tracks = [track for track in new_filtered_tracks if
+                                 track['id'] not in existing_filtered_tracks_ids]
 
         filtered_tracks.extend(unique_new_tracks)
+        all_tempos.extend(new_tempos)  # Store the tempos
+
+        # Print the progress
+        print(f"{len(filtered_tracks)} out of {playlist_length} tracks collected.")
 
         # Check if we have enough unique recommendations to proceed
         if len(recommended_tracks) < 100:
@@ -124,9 +90,19 @@ def main():
         print("Not enough tracks. Try increasing tempo tolerance and/or reducing playlist length.")
         return
 
+    # Calculate lowest and highest tempo
+    if all_tempos:
+        lowest_bpm = min(all_tempos)
+        highest_bpm = max(all_tempos)
+        # Create the playlist description with BPM info
+        playlist_description = f"{lowest_bpm:.2f}-{highest_bpm:.2f}"
+        print("Playlist description:", playlist_description)  # Print description to console
+    else:
+        print("No tracks found with the specified tempo range.")
+        return
+
     # Create a new playlist
     playlist_name = input("Playlist name: ")
-    playlist_description = input("Playlist description: ")
     playlist_id = create_playlist(sp, user_id, playlist_name, playlist_description)
 
     # Add tracks to the new playlist
