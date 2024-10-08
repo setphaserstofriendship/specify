@@ -1,4 +1,5 @@
 import os
+import configparser
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from functions import (
@@ -13,11 +14,24 @@ from functions import (
     add_tracks_to_playlist
 )
 
+# Define the path to the config file in the user's home directory
+config_file_path = os.path.expanduser("~/.config/specify/specify.conf")
+
+# Check if the config file exists
+if not os.path.exists(config_file_path):
+    print(f"Config file not found at {config_file_path}. Please use the template config found in the repo and fill "
+          f"out your Spotify credentials.")
+    exit(1)
+
+# Read from the .conf file
+config = configparser.ConfigParser()
+config.read(config_file_path)
+
 # Spotify API credentials
-CLIENT_ID = os.getenv('SPOTIPY_CLIENT_ID')
-CLIENT_SECRET = os.getenv('SPOTIPY_CLIENT_SECRET')
-REDIRECT_URI = "http://localhost:8888/callback"
-SCOPE = "user-library-read playlist-modify-public user-top-read"
+CLIENT_ID = config.get('spotify', 'client_id', fallback=os.getenv('SPOTIPY_CLIENT_ID'))
+CLIENT_SECRET = config.get('spotify', 'client_secret', fallback=os.getenv('SPOTIPY_CLIENT_SECRET'))
+REDIRECT_URI = config.get('spotify', 'redirect_uri', fallback="http://localhost:8888/callback")
+SCOPE = config.get('spotify', 'scope', fallback="user-library-read playlist-modify-public user-top-read")
 
 # Authenticate with Spotify
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=CLIENT_ID,
@@ -29,13 +43,33 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=CLIENT_ID,
 # Main function
 def main():
     display_banner()
-    target_tempo = int(input("Enter desired tempo (bpm): "))  # Desired tempo
-    tempo_tolerance = int(input("Specify +- bpm tolerance (low tolerance may lead to a short playlist): "))  # Tolerance
-    playlist_length = int(input("Minimum playlist length (no. of tracks): "))
-    exclude_existing_tracks = input("Should the playlist exclude tracks already present in your other playlists? (y/n): ").strip().lower() == 'y'
 
-    # Ask user to select seed type
-    seed_source = input("Seed playlist with (1) Top tracks or (2) Liked songs? Enter 1 or 2: ").strip()
+    # Read values from the config file or ask the user if missing
+    try:
+        target_tempo = int(config.get('playlist_settings', 'target_tempo'))
+    except (configparser.NoOptionError, ValueError):
+        target_tempo = int(input("Enter desired tempo (bpm): "))
+
+    try:
+        tempo_tolerance = int(config.get('playlist_settings', 'tempo_tolerance'))
+    except (configparser.NoOptionError, ValueError):
+        tempo_tolerance = int(input("Specify +- bpm tolerance (low tolerance may lead to a short playlist): "))
+
+    try:
+        playlist_length = int(config.get('playlist_settings', 'playlist_length'))
+    except (configparser.NoOptionError, ValueError):
+        playlist_length = int(input("Minimum playlist length (no. of tracks): "))
+
+    try:
+        exclude_existing_tracks = config.getboolean('playlist_settings', 'exclude_existing_tracks')
+    except (configparser.NoOptionError, ValueError):
+        exclude_existing_tracks = input(
+            "Should the playlist exclude tracks already present in your other playlists? (y/n): ").strip().lower() == 'y'
+
+    try:
+        seed_source = config.get('playlist_settings', 'seed_source')
+    except configparser.NoOptionError:
+        seed_source = input("Seed playlist with (1) Top tracks or (2) Liked songs? Enter 1 or 2: ").strip()
 
     user_id = sp.current_user()['id']
 
