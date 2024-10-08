@@ -58,6 +58,37 @@ def create_playlist(sp, user_id, name, description):
     return playlist['id']
 
 
+def delete_all_playlists(sp, user_id):
+    print("Fetching your playlists...")
+
+    # Fetch all playlists
+    playlists = sp.user_playlists(user_id)
+
+    playlists_to_delete = []
+
+    # Collect all playlists to be deleted
+    for playlist in playlists['items']:
+        playlists_to_delete.append(playlist)
+
+    # Confirm deletion with the user
+    if not playlists_to_delete:
+        print("No playlists found to delete.")
+        return
+
+    print(f"Found {len(playlists_to_delete)} playlists to delete.")
+    confirm = input(f"Are you sure you want to delete {len(playlists_to_delete)} playlists? (y/n): ").strip().lower()
+    if confirm != 'y':
+        print("Aborting playlist deletion.")
+        return
+
+    # Delete each playlist
+    for playlist in playlists_to_delete:
+        print(f"Deleting playlist: {playlist['name']} (ID: {playlist['id']})")
+        sp.current_user_unfollow_playlist(playlist['id'])  # Unfollow the playlist (delete it)
+
+    print(f"Deleted {len(playlists_to_delete)} playlists successfully.")
+
+
 def add_tracks_to_playlist(sp, playlist_id, tracks):
     if not tracks:
         print("No tracks to add to the playlist.")
