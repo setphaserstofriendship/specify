@@ -1,5 +1,3 @@
-#!/home/lukash/scripts/specify/venv/bin/python
-
 import os
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
