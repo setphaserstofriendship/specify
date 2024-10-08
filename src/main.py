@@ -28,8 +28,8 @@ config = configparser.ConfigParser()
 config.read(config_file_path)
 
 # Spotify API credentials
-CLIENT_ID = config.get('spotify', 'client_id', fallback=os.getenv('SPOTIPY_CLIENT_ID'))
-CLIENT_SECRET = config.get('spotify', 'client_secret', fallback=os.getenv('SPOTIPY_CLIENT_SECRET'))
+CLIENT_ID = config.get('spotify', 'client_id')
+CLIENT_SECRET = config.get('spotify', 'client_secret')
 REDIRECT_URI = config.get('spotify', 'redirect_uri', fallback="http://localhost:8888/callback")
 SCOPE = config.get('spotify', 'scope', fallback="user-library-read playlist-modify-public user-top-read")
 
