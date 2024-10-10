@@ -14,62 +14,58 @@ from functions import (
     add_tracks_to_playlist
 )
 
-# Define the path to the config file in the user's home directory
+# Step 1: Check if credentials are available in environment variables
+CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
+CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
+
+# Step 2: Prompt the user if environment variables are not set
+if not CLIENT_ID:
+    CLIENT_ID = input("Enter your Spotify Client ID: ").strip()
+if not CLIENT_SECRET:
+    CLIENT_SECRET = input("Enter your Spotify Client Secret: ").strip()
+
+# Step 3: Define the path to the config file
 config_file_path = os.path.expanduser("~/.config/specify/specify.conf")
 
-# Check if the config file exists
-if not os.path.exists(config_file_path):
-    print(f"Config file not found at {config_file_path}. Please use the template config found in the repo and fill "
-          f"out your Spotify credentials.")
-    exit(1)
-
-# Read from the .conf file
+# Step 4: Check if the config file exists
 config = configparser.ConfigParser()
-config.read(config_file_path)
+if os.path.exists(config_file_path):
+    config.read(config_file_path)
+else:
+    print(f"Config file not found at {config_file_path}. Using user input for configuration settings.")
 
-# Spotify API credentials
-CLIENT_ID = config.get('spotify', 'client_id')
-CLIENT_SECRET = config.get('spotify', 'client_secret')
+
+def get_config_value(section, option, prompt, cast_func=str):
+    try:
+        return cast_func(config.get(section, option))
+    except (configparser.NoOptionError, configparser.NoSectionError, ValueError):
+        return cast_func(input(prompt))
+
+# Spotify authentication settings
 REDIRECT_URI = config.get('spotify', 'redirect_uri', fallback="http://localhost:8888/callback")
 SCOPE = config.get('spotify', 'scope', fallback="user-library-read playlist-modify-public user-top-read")
 
-# Authenticate with Spotify
+# Authenticate with Spotify using the credentials
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=CLIENT_ID,
                                                client_secret=CLIENT_SECRET,
                                                redirect_uri=REDIRECT_URI,
                                                scope=SCOPE))
 
 
-# Main function
 def main():
     display_banner()
 
-    # Read values from the config file or ask the user if missing
-    try:
-        target_tempo = int(config.get('playlist_settings', 'target_tempo'))
-    except (configparser.NoOptionError, ValueError):
-        target_tempo = int(input("Enter desired tempo (bpm): "))
-
-    try:
-        tempo_tolerance = int(config.get('playlist_settings', 'tempo_tolerance'))
-    except (configparser.NoOptionError, ValueError):
-        tempo_tolerance = int(input("Specify +- bpm tolerance (low tolerance may lead to a short playlist): "))
-
-    try:
-        playlist_length = int(config.get('playlist_settings', 'playlist_length'))
-    except (configparser.NoOptionError, ValueError):
-        playlist_length = int(input("Minimum playlist length (no. of tracks): "))
-
-    try:
-        exclude_existing_tracks = config.getboolean('playlist_settings', 'exclude_existing_tracks')
-    except (configparser.NoOptionError, ValueError):
-        exclude_existing_tracks = input(
-            "Should the playlist exclude tracks already present in your other playlists? (y/n): ").strip().lower() == 'y'
-
-    try:
-        seed_source = config.get('playlist_settings', 'seed_source')
-    except configparser.NoOptionError:
-        seed_source = input("Seed playlist with (1) Top tracks or (2) Liked songs? Enter 1 or 2: ").strip()
+    # Get configuration settings
+    target_tempo = get_config_value('playlist_settings', 'target_tempo', "Enter desired tempo (bpm): ", int)
+    tempo_tolerance = get_config_value('playlist_settings', 'tempo_tolerance',
+                                       "Specify +- bpm tolerance (low tolerance may lead to a short playlist): ", int)
+    playlist_length = get_config_value('playlist_settings', 'playlist_length',
+                                       "Minimum playlist length (no. of tracks): ", int)
+    exclude_existing_tracks = get_config_value('playlist_settings', 'exclude_existing_tracks',
+                                               "Should the playlist exclude tracks already present in your other playlists? (y/n): ",
+                                               lambda x: x.strip().lower() == 'y')
+    seed_source = get_config_value('playlist_settings', 'seed_source',
+                                   "Seed playlist with (1) Top tracks or (2) Liked songs? Enter 1 or 2: ")
 
     user_id = sp.current_user()['id']
 
